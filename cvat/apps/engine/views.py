@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import boto3
 import os.path as osp
 import shutil
 import traceback
@@ -11,6 +12,8 @@ from distutils.util import strtobool
 from tempfile import mkstemp
 
 import django_rq
+from botocore.exceptions import ClientError
+from cffi import api
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -24,7 +27,7 @@ from drf_yasg import openapi
 from drf_yasg.inspectors import CoreAPICompatInspector, NotHandled
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import mixins, serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.renderers import JSONRenderer
@@ -48,7 +51,20 @@ from cvat.apps.engine.utils import av_scan_paths
 
 from . import models, task
 from .log import clogger, slogger
+from botocore.config import Config
 
+treeData = []
+
+# my_config = Config(
+#     region_name = 'ap-south-1',
+#     AWS_ACCESS_KEY_ID = 'AKIAYZ4PWU5ORVURRTFR',
+#     AWS_SECRET_ACCESS_KEY='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',
+#     signature_version = 'v4',
+#     retries = {
+#         'max_attempts': 10,
+#         'mode': 'standard'
+#     }
+# )
 
 class ServerViewSet(viewsets.ViewSet):
     serializer_class = None
@@ -704,16 +720,7 @@ class JobViewSet(viewsets.GenericViewSet,
                     return Response(data=str(e), status=status.HTTP_400_BAD_REQUEST)
                 return Response(data)
 
-class UserFilter(filters.FilterSet):
-    class Meta:
-        model = User
-        fields = ("id",)
-
-
 @method_decorator(name='list', decorator=swagger_auto_schema(
-    manual_parameters=[
-            openapi.Parameter('id',openapi.IN_QUERY,description="A unique number value identifying this user",type=openapi.TYPE_NUMBER),
-    ],
     operation_summary='Method provides a paginated list of users registered on the server'))
 @method_decorator(name='retrieve', decorator=swagger_auto_schema(
     operation_summary='Method provides information of a specific user'))
@@ -725,8 +732,6 @@ class UserViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
     mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     queryset = User.objects.prefetch_related('groups').all().order_by('id')
     http_method_names = ['get', 'post', 'head', 'patch', 'delete']
-    search_fields = ('username', 'first_name', 'last_name')
-    filterset_class = UserFilter
 
     def get_serializer_class(self):
         user = self.request.user
@@ -884,3 +889,118 @@ def _export_annotations(db_task, rq_id, request, format_name, action, callback, 
         meta={ 'request_time': timezone.localtime() },
         result_ttl=ttl, failure_ttl=ttl)
     return Response(status=status.HTTP_202_ACCEPTED)
+
+
+@api_view(["GET"])
+# @permission_classes()
+def get_s3_data(request):
+    s3_resource = boto3.client("s3",region_name='ap-south-1',aws_access_key_id='AKIAYZ4PWU5ORVURRTFR',
+    aws_secret_access_key='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')
+
+    response = s3_resource.list_objects_v2(
+        Bucket='cvat-elixir',
+        Prefix='data/')
+    dirKeys = []
+
+    for file in response['Contents']:
+        dirKeys.append(file['Key'])
+
+    dirKeys.reverse()
+
+    def addChildinExistingFolder(dirName, childData):
+        # Add child in existing folder.
+        for i in treeData:
+            if (i['title'] == dirName):
+                i['children'].append(childData)
+
+    def createLeafNode(s3Key, baseName, dirName):
+        # create file
+        dirList = dirName.split('/')
+        tempDirList = []
+        tempFile = {}
+        tempFile['key'] = s3Key
+        tempFile['title'] = baseName
+        tempFile['isLeaf'] = bool(True)
+        for dir in treeData:
+            tempDirList.append(dir['title'])
+        if (dirList[-1] not in tempDirList):
+            createFolder(dirName, dirList[-1], tempFile)
+        else:
+            addChildinExistingFolder(dirList[-1], tempFile)
+
+    def createParentFolder(s3Key, dirName):
+        # Create Parent Folder.
+        global treeData
+        tempTreeData = treeData
+        tempFolder = {}
+        treeData = []
+        tempFolder['key'] = s3Key
+        tempFolder['title'] = dirName
+        tempFolder['children'] = tempTreeData
+        treeData.append(tempFolder)
+
+    def createFolder(s3Key, folderName, childData):
+        # create folde
+        tempFolder = {}
+        tempChild = []
+        tempChild.append(childData)
+        tempFolder['title'] = folderName
+        tempFolder['key'] = s3Key
+        tempFolder['children'] = tempChild
+        # treeData = []
+        treeData.append(tempFolder)
+
+    for dir in dirKeys:
+        baseName = os.path.basename(dir)
+        dirName = os.path.dirname(dir)
+        if (baseName):
+            # create File.
+            createLeafNode(dir, baseName, dirName)
+        else:
+            # create folder.
+            dirList = dirName.split('/')
+            tempDirNames = []
+            for i in treeData:
+                tempDirNames.append(i['title'])
+            if (dirList[-1] not in tempDirNames):
+                createParentFolder(dir, dirList[-1])
+    return Response({'data': treeData}, status=status.HTTP_200_OK)
+
+def generate_pre_signed_url(key):
+    s3_resource = boto3.client("s3" ,region_name='ap-south-1', aws_access_key_id='AKIAYZ4PWU5ORVURRTFR',
+    aws_secret_access_key='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')
+
+    try:
+        url = s3_resource.generate_presigned_url('get_object',
+                                                    Params={'Bucket': 'cvat-elixir',
+                                                            'Key': key},
+                                                    ExpiresIn=86400)
+    except ClientError as e:
+        # logging.error(e)
+        return None
+    return url
+
+@api_view(["POST"])
+def get_s3_signed_data(request):
+    try:
+        keyList = request.data.get('keys',[])
+        keys=[]
+        for key in keyList:
+            if(len(os.path.basename(key).split('.')) > 1):
+                keys.append((key))
+        #print('keys -> ', keys)
+        urls = []
+        for key in keys:
+            urls.append(generate_pre_signed_url(key))
+        print(urls)
+        return  Response(urls,status=status.HTTP_200_OK)
+    except Exception as ex:
+        print('exception -> ', ex)
+        # logger.critical(
+        #     "Caught exception in {}".format(__file__),
+        #     exc_info=True
+        # )
+        return Response(
+            {"message": ex.__str__()},
+            status=status.HTTP_400_BAD_REQUEST
+        )

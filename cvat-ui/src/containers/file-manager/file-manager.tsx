@@ -14,6 +14,7 @@ import { ShareItem, CombinedState } from 'reducers/interfaces';
 interface OwnProps {
     ref: any;
     withRemote: boolean;
+    handleS3: (value: any) => void
 }
 
 interface StateToProps {
@@ -63,18 +64,24 @@ export class FileManagerContainer extends React.PureComponent<Props> {
         return this.managerComponentRef.getFiles();
     }
 
+    public async getFileLinks(): Promise<any> {
+        const fileLinks = await this.managerComponentRef.getFileLinks()
+        return fileLinks;
+    }
+
     public reset(): Files {
         return this.managerComponentRef.reset();
     }
 
     public render(): JSX.Element {
-        const { treeData, getTreeData, withRemote } = this.props;
+        const { treeData, getTreeData, withRemote, handleS3 } = this.props;
 
         return (
             <FileManagerComponent
                 treeData={treeData}
                 onLoadData={getTreeData}
                 withRemote={withRemote}
+                handleS3={handleS3}
                 ref={(component): void => {
                     this.managerComponentRef = component;
                 }}
