@@ -11,26 +11,38 @@ import Text from 'antd/lib/typography/Text';
 import Paragraph from 'antd/lib/typography/Paragraph';
 import Upload, { RcFile } from 'antd/lib/upload';
 import Empty from 'antd/lib/empty';
+import aws from 'aws-sdk'
 import Tree, { AntTreeNode, TreeNodeNormal } from 'antd/lib/tree/Tree';
+import FileBrowser, {Icons} from 'react-keyed-file-browser'
+import 'react-keyed-file-browser/dist/react-keyed-file-browser.css'
+import axios from 'axios'
 
 import consts from 'consts';
+import { relativeTimeThreshold } from 'moment';
+import getCore from 'cvat-core-wrapper';
+const core = getCore();
+const baseURL = core.config.backendAPI
 
 export interface Files {
     local: File[];
     share: string[];
     remote: string[];
+    s3: File[]
 }
 
 interface State {
     files: Files;
     expandedKeys: string[];
-    active: 'local' | 'share' | 'remote';
+    active: 'local' | 'share' | 'remote' | 's3';
+    s3SelectedKeys: string[];
+    s3Directories: object[]
 }
 
 interface Props {
     withRemote: boolean;
     treeData: TreeNodeNormal[];
     onLoadData: (key: string, success: () => void, failure: () => void) => void;
+    handleS3: (value: any) => void
 }
 
 export default class FileManager extends React.PureComponent<Props, State> {
@@ -42,12 +54,29 @@ export default class FileManager extends React.PureComponent<Props, State> {
                 local: [],
                 share: [],
                 remote: [],
+                s3: []
             },
+            s3SelectedKeys: [],
             expandedKeys: [],
             active: 'local',
+            s3Directories:[]
         };
 
         this.loadData('/');
+    }
+
+   
+     componentDidMount(){
+        core.server
+                .request(`${baseURL}/get_s3_data/`, {
+                    method: 'GET',
+                }).then((response: any): void => {
+                    this.setState({
+                        s3Directories: response.data
+                    })
+                }).catch((error: any): void => {
+                    console.log(error.toString())
+                })
     }
 
     public getFiles(): Files {
@@ -56,7 +85,26 @@ export default class FileManager extends React.PureComponent<Props, State> {
             local: active === 'local' ? files.local : [],
             share: active === 'share' ? files.share : [],
             remote: active === 'remote' ? files.remote : [],
+            s3: active === 's3' ? files.s3 : [],
         };
+    }
+
+    public async getFileLinks(): Promise<any> {
+        const { s3SelectedKeys } = this.state;
+       const response = await core.server
+                .request(`${baseURL}/get_s3_signed_data/`,{
+                    method: 'POST',
+                    data: {
+                        'keys': s3SelectedKeys
+                    }
+                }).then((response: any): void => {
+                    console.log('response -> ', response)
+                    return response
+                }).catch((error: any): void => {
+                    return error
+                })
+        return response
+        
     }
 
     private loadData = (key: string): Promise<void> =>
@@ -213,26 +261,73 @@ export default class FileManager extends React.PureComponent<Props, State> {
             </Tabs.TabPane>
         );
     }
+    public handleSelect = (event: object): void => {
+        const ele: string = event.key
+        console.log(ele.split('/'))
+    }
+    private renderS3BucketSelector(): JSX.Element {
+        const { DirectoryTree } = Tree;
+        
+          const onSelect = (keys, event) => {
+            console.log('Trigger Select', keys, event);
+          };
+          const onCheck = (checkedKeys, info) => {
+            this.setState({
+                s3SelectedKeys: checkedKeys
+            })
+          };
+        
+          const onExpand = () => {
+            console.log('Trigger Expand');
+          };
+        return (
+            <Tabs.TabPane key='s3' tab='S3 Bucket'>
+                {/* <FileBrowser 
+                files={s3Files}
+                icons={Icons.FontAwesome(4)}
+                // onSelect={this.handleSelect}
+                /> */}
+                <DirectoryTree
+                    checkable
+                    multiple
+                    defaultExpandAll
+                    onSelect={onSelect}
+                    onExpand={onExpand}
+                    onCheck={onCheck}
+                    treeData={this.state.s3Directories}
+                />
+            </Tabs.TabPane>
+        );
+    }
+
 
     public render(): JSX.Element {
         const { withRemote } = this.props;
         const { active } = this.state;
-
+        
         return (
             <>
                 <Tabs
                     type='card'
                     activeKey={active}
                     tabBarGutter={5}
-                    onChange={(activeKey: string): void =>
+                    onChange={(activeKey: string): void =>{
                         this.setState({
                             active: activeKey as any,
                         })
+                        if(activeKey === 's3'){
+                            this.props.handleS3(true)
+                        }else{
+                            this.props.handleS3(false)
+                        }
+                        
+                    }
                     }
                 >
                     {this.renderLocalSelector()}
                     {this.renderShareSelector()}
                     {withRemote && this.renderRemoteSelector()}
+                    {this.renderS3BucketSelector()}
                 </Tabs>
             </>
         );

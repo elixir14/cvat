@@ -17,12 +17,18 @@ import BasicConfigurationForm, { BaseConfiguration } from './basic-configuration
 import AdvancedConfigurationForm, { AdvancedConfiguration } from './advanced-configuration-form';
 import LabelsEditor from '../labels-editor/labels-editor';
 import { Files } from '../file-manager/file-manager';
+import axios from 'axios'
+const fs = require('fs');
+import getCore from 'cvat-core-wrapper';
+const core = getCore();
 
 export interface CreateTaskData {
     basic: BaseConfiguration;
     advanced: AdvancedConfiguration;
     labels: any[];
     files: Files;
+    isS3Data: Boolean;
+    fileLinks: string[]
 }
 
 interface Props {
@@ -48,7 +54,10 @@ const defaultState = {
         local: [],
         share: [],
         remote: [],
+        s3:[]
     },
+    isS3Data: false,
+    fileLinks: []
 };
 
 class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps, State> {
@@ -114,21 +123,135 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
         });
     };
 
-    private handleSubmitClick = (): void => {
-        if (!this.validateLabels()) {
-            notification.error({
-                message: 'Could not create a task',
-                description: 'A task must contain at least one label',
-            });
-            return;
-        }
+    private downloadFiles = async (): Promise<any> => {
+        const fileLinks = await this.fileManagerContainer.getFileLinks()
+        this.setState({
+            fileLinks: fileLinks
+        })
+        this.state.fileLinks.map((imgLink) => {
 
-        if (!this.validateFiles()) {
-            notification.error({
-                message: 'Could not create a task',
-                description: 'A task must contain at least one file',
-            });
-            return;
+            let img = document.createElement('img');
+            img.src = imgLink
+
+            // make <canvas> of the same size
+            let canvas = document.createElement('canvas');
+            canvas.width = '500px';
+            canvas.height = '500px';
+
+            let context = canvas.getContext('2d');
+
+            // copy image to it (this method allows to cut image)
+            context.drawImage(img, 0, 0);
+            // we can context.rotate(), and do many other things on canvas
+
+            // toBlob is async opereation, callback is called when done
+            canvas.toBlob(function(blob) {
+            // blob ready, download it
+            let link = document.createElement('a');
+            link.download = imgLink;
+
+            link.href = URL.createObjectURL(blob);
+            link.click();
+
+            // delete the internal blob reference, to let the browser clear memory from it
+            URL.revokeObjectURL(link.href);
+            }, 'image/png');
+            console.log('img -> ', img)
+            console.log('canvas -> ', canvas)
+
+
+            // const x = this
+            // let tempImage: any;
+            // var request = require('request'), 
+            // fs = require('fs');
+            // const img = new File(link)
+            // var reader  = new FileReader();
+
+            // reader.onloadend = function () {
+            //   console.log(reader.result);
+            // }
+            // reader.readAsDataURL(link);
+            // console.log(reader)
+            // axios.get(link).then((response) => {
+            //     console.log('buffer -> ', response);
+                
+            //     // img.src = response.data
+            //     x.setState({
+            //                     files: {
+            //                         ...x.state.files,
+            //                         s3: [...x.state.files.s3, img],
+            //                     }
+            //                 })
+                // fs.writeFile(tempImage, response.data, {
+                //         encoding : null
+                //     }, function(err: any) {
+                
+                //         if (err)
+                //             throw err;
+                //         console.log('It\'s saved!');
+                //         x.setState({
+                //             files: {
+                //                 ...x.state.files,
+                //                 s3: [...x.state.files.s3, tempImage],
+                //             }
+                //         })
+                //     })
+            // }).catch((error: any) => {
+            //     console.log(error.toString())
+            // })
+            // core.server
+            //     .request(link, {
+            //         method: 'GET',
+            //     }).then((response: any): void => {
+            //         console.log('buffer -> ', response instanceof Buffer);
+            
+                    //do what you want with body
+                    //like writing the buffer to a file
+                    // fs.writeFile(tempImage, body, {
+                    //     encoding : null
+                    // }, function(err) {
+                
+                    //     if (err)
+                    //         throw err;
+                    //     console.log('It\'s saved!');
+                    //     x.setState({
+                    //         files: {
+                    //             ...x.state.files,
+                    //             s3: [...x.state.files.s3, tempImage],
+                    //         }
+                    //     })
+                // }).catch((error: any): void => {
+                //     console.log(error.toString())
+                // })
+        })
+        // this.setState({
+        //     files,
+        // });
+        // const totalLen = Object.keys(files).reduce((acc, key) => acc + files[key].length, 0);
+
+        // return !!totalLen;
+    };
+
+    private handleSubmitClick = (): void => {
+        if(!this.state.isS3Data){
+            if (!this.validateLabels()) {
+                notification.error({
+                    message: 'Could not create a task',
+                    description: 'A task must contain at least one label',
+                });
+                return;
+            }
+    
+            if (!this.validateFiles()) {
+                notification.error({
+                    message: 'Could not create a task',
+                    description: 'A task must contain at least one file',
+                });
+                return;
+            }
+        }else{
+            this.downloadFiles()
+            // console.log(fileLinks)
         }
 
         this.basicConfigurationComponent
@@ -186,12 +309,19 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
         );
     }
 
+    private handleS3 = (value: boolean) => {
+        this.setState({
+            isS3Data: value
+        })
+    }
+
     private renderFilesBlock(): JSX.Element {
         return (
             <Col span={24}>
                 <Text type='danger'>* </Text>
                 <Text className='cvat-text-color'>Select files:</Text>
                 <ConnectedFileManager
+                    handleS3={this.handleS3}
                     ref={(container: any): void => {
                         this.fileManagerContainer = container;
                     }}

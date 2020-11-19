@@ -43,6 +43,7 @@ def wrap_swagger(view):
 
     return _map_format_to_schema
 
+
 router = routers.DefaultRouter(trailing_slash=False)
 router.register('projects', views.ProjectViewSet)
 router.register('tasks', views.TaskViewSet)
@@ -66,5 +67,9 @@ urlpatterns = [
 
     # entry point for API
     path('api/v1/auth/', include('cvat.apps.authentication.urls')),
-    path('api/v1/', include((router.urls, 'cvat'), namespace='v1'))
+    path('api/v1/', include((router.urls, 'cvat'), namespace='v1')),
+    path('api/v1/get_s3_data/', views.get_s3_data),
+    path('api/v1/get_s3_signed_data/', views.get_s3_signed_data)
 ]
+
+# urlpatterns += router.urls
