@@ -51,9 +51,12 @@ from cvat.apps.engine.utils import av_scan_paths
 
 from . import models, task
 from .log import clogger, slogger
+from dotenv import load_dotenv
+
 from botocore.config import Config
 
 treeData = []
+load_dotenv()
 
 # my_config = Config(
 #     region_name = 'ap-south-1',
@@ -894,6 +897,7 @@ def _export_annotations(db_task, rq_id, request, format_name, action, callback, 
 @api_view(["GET"])
 # @permission_classes()
 def get_s3_data(request):
+    print(os.getenv("REACT_APP_AWS_ID"))
     s3_resource = boto3.client("s3",region_name='ap-south-1',aws_access_key_id='AKIAYZ4PWU5ORVURRTFR',
     aws_secret_access_key='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')
 

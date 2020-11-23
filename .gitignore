@@ -20,6 +20,9 @@ __pycache__
 *.pyc
 ._*
 .coverage
+/venv
+.idea/*
+.idea
 
 # Ignore development npm files
 node_modules
