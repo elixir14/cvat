@@ -21,12 +21,14 @@ import axios from 'axios'
 const fs = require('fs');
 import getCore from 'cvat-core-wrapper';
 const core = getCore();
+const baseURL = core.config.backendAPI
 
 export interface CreateTaskData {
     basic: BaseConfiguration;
     advanced: AdvancedConfiguration;
     labels: any[];
     files: Files;
+    s3_data: any[];
     isS3Data: Boolean;
     fileLinks: string[]
 }
@@ -50,6 +52,7 @@ const defaultState = {
         useCache: true,
     },
     labels: [],
+    s3_data: [{"image": "heloo"}],
     files: {
         local: [],
         share: [],
@@ -125,39 +128,53 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
 
     private downloadFiles = async (): Promise<any> => {
         const fileLinks = await this.fileManagerContainer.getFileLinks()
+        console.log('fileLinks -> ', fileLinks)
         this.setState({
             fileLinks: fileLinks
         })
-        this.state.fileLinks.map((imgLink) => {
+        // const response = await core.server
+        //         .request(`${baseURL}/s3_data/`,{
+        //             method: 'POST',
+        //             data: {
+        //                 'keys': fileLinks
+        //             }
+        //         }).then((response: any): void => {
+        //             console.log('response -> ', response)
+        //             return response
+        //         }).catch((error: any): void => {
+        //             return error
+        //         })
+        // console.log('s3 response -> ', response)
+        // this.state.fileLinks.map((imgLink) => {
 
-            let img = document.createElement('img');
-            img.src = imgLink
+        //     let img = document.createElement('img');
+        //     img.src = imgLink
 
-            // make <canvas> of the same size
-            let canvas = document.createElement('canvas');
-            canvas.width = '500px';
-            canvas.height = '500px';
+        //     // make <canvas> of the same size
+        //     let canvas = document.createElement('canvas');
+        //     canvas.width = '500px';
+        //     canvas.height = '500px';
 
-            let context = canvas.getContext('2d');
+        //     let context = canvas.getContext('2d');
 
-            // copy image to it (this method allows to cut image)
-            context.drawImage(img, 0, 0);
-            // we can context.rotate(), and do many other things on canvas
+        //     // copy image to it (this method allows to cut image)
+        //     context.drawImage(img, 0, 0);
+        //     // we can context.rotate(), and do many other things on canvas
 
-            // toBlob is async opereation, callback is called when done
-            canvas.toBlob(function(blob) {
-            // blob ready, download it
-            let link = document.createElement('a');
-            link.download = imgLink;
+        //     // toBlob is async opereation, callback is called when done
+        //     canvas.toBlob(function(blob) {
+        //     // blob ready, download it
+        //     let link = document.createElement('a');
+        //     link.download = imgLink;
 
-            link.href = URL.createObjectURL(blob);
-            link.click();
+        //     link.href = URL.createObjectURL(blob);
+        //     link.click();
 
-            // delete the internal blob reference, to let the browser clear memory from it
-            URL.revokeObjectURL(link.href);
-            }, 'image/png');
-            console.log('img -> ', img)
-            console.log('canvas -> ', canvas)
+        //     // delete the internal blob reference, to let the browser clear memory from it
+        //     URL.revokeObjectURL(link.href);
+        //     }, 'image/png');
+        //     console.log('img -> ', img)
+        //     console.log('canvas -> ', canvas)
 
 
             // const x = this
@@ -223,7 +240,7 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
                 // }).catch((error: any): void => {
                 //     console.log(error.toString())
                 // })
-        })
+        // })
         // this.setState({
         //     files,
         // });
@@ -253,7 +270,6 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
             this.downloadFiles()
             // console.log(fileLinks)
         }
-
         this.basicConfigurationComponent
             .submit()
             .then(() => {
@@ -267,6 +283,7 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
             })
             .then((): void => {
                 const { onCreate } = this.props;
+                console.log(this.state, "fenil bhaiii")
                 onCreate(this.state);
             })
             .catch((error: Error): void => {

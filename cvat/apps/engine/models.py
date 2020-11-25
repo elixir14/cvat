@@ -11,6 +11,8 @@ from django.conf import settings
 
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
+from django.contrib.postgres.fields import JSONField
+
 
 class SafeCharField(models.CharField):
     def get_prep_value(self, value):
@@ -54,6 +56,7 @@ class StorageMethodChoice(str, Enum):
     def __str__(self):
         return self.value
 
+
 class Data(models.Model):
     chunk_size = models.PositiveIntegerField(null=True)
     size = models.PositiveIntegerField(default=0)
@@ -65,7 +68,9 @@ class Data(models.Model):
         default=DataChoice.IMAGESET)
     original_chunk_type = models.CharField(max_length=32, choices=DataChoice.choices(),
         default=DataChoice.IMAGESET)
-    storage_method = models.CharField(max_length=15, choices=StorageMethodChoice.choices(), default=StorageMethodChoice.FILE_SYSTEM)
+    storage_method = models.CharField(
+        max_length=15, choices=StorageMethodChoice.choices(), default=StorageMethodChoice.FILE_SYSTEM
+    )
 
     class Meta:
         default_permissions = ()
@@ -174,6 +179,7 @@ class Task(models.Model):
     status = models.CharField(max_length=32, choices=StatusChoice.choices(),
         default=StatusChoice.ANNOTATION)
     data = models.ForeignKey(Data, on_delete=models.CASCADE, null=True, related_name="tasks")
+    s3_data = JSONField(null=True)
 
     # Extend default permission model
     class Meta:

@@ -91,19 +91,19 @@ export default class FileManager extends React.PureComponent<Props, State> {
 
     public async getFileLinks(): Promise<any> {
         const { s3SelectedKeys } = this.state;
-       const response = await core.server
-                .request(`${baseURL}/get_s3_signed_data/`,{
-                    method: 'POST',
-                    data: {
-                        'keys': s3SelectedKeys
-                    }
-                }).then((response: any): void => {
-                    console.log('response -> ', response)
-                    return response
-                }).catch((error: any): void => {
-                    return error
-                })
-        return response
+    //    const response = await core.server
+    //             .request(`${baseURL}/get_s3_signed_data/`,{
+    //                 method: 'POST',
+    //                 data: {
+    //                     'keys': s3SelectedKeys
+    //                 }
+    //             }).then((response: any): void => {
+    //                 console.log('response -> ', response)
+    //                 return response
+    //             }).catch((error: any): void => {
+    //                 return error
+    //             })
+        return s3SelectedKeys
         
     }
 

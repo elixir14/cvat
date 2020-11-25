@@ -278,10 +278,11 @@ class TaskSerializer(WriteOnceMixin, serializers.ModelSerializer):
     owner_id = serializers.IntegerField(write_only=True, allow_null=True, required=False)
     assignee = BasicUserSerializer(allow_null=True, required=False)
     assignee_id = serializers.IntegerField(write_only=True, allow_null=True, required=False)
+    s3_data = serializers.JSONField(required=False)
 
     class Meta:
         model = models.Task
-        fields = ('url', 'id', 'name', 'mode', 'owner', 'assignee', 'owner_id', 'assignee_id',
+        fields = ('url', 'id', 'name', 'mode', 'owner', 'assignee', 'owner_id', 'assignee_id', 's3_data',
             'bug_tracker', 'created_date', 'updated_date', 'overlap',
             'segment_size', 'status', 'labels', 'segments',
             'project', 'data_chunk_size', 'data_compressed_chunk_type', 'data_original_chunk_type', 'size', 'image_quality', 'data')

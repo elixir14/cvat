@@ -376,11 +376,11 @@ export function createTaskAsync(data: any): ThunkAction<Promise<void>, {}, {}, A
         const description: any = {
             name: data.basic.name,
             labels: data.labels,
+            s3_data: data.fileLinks,
             image_quality: 70,
             use_zip_chunks: data.advanced.useZipChunks,
             use_cache: data.advanced.useCache,
         };
-
         if (data.advanced.bugTracker) {
             description.bug_tracker = data.advanced.bugTracker;
         }

@@ -334,6 +334,7 @@ class TaskViewSet(auth.TaskGetQuerySetMixin, viewsets.ModelViewSet):
     search_fields = ("name", "owner__username", "mode", "status")
     filterset_class = TaskFilter
     ordering_fields = ("id", "name", "owner", "status", "assignee")
+    print('query set -> ', queryset)
 
     def get_permissions(self):
         http_method = self.request.method
@@ -355,6 +356,7 @@ class TaskViewSet(auth.TaskGetQuerySetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         def validate_task_limit(owner):
             admin_perm = auth.AdminRolePermission()
+            print(self.request.data, "checking request data**")
             is_admin = admin_perm.has_permission(self.request, self)
             if not is_admin and settings.RESTRICTIONS['task_limit'] is not None and \
                 Task.objects.filter(owner=owner).count() >= settings.RESTRICTIONS['task_limit']:
@@ -402,16 +404,19 @@ class TaskViewSet(auth.TaskGetQuerySetMixin, viewsets.ModelViewSet):
                 description="A unique number value identifying chunk or frame, doesn't matter for 'preview' type"),
             ]
     )
+
     @action(detail=True, methods=['POST', 'GET'])
     def data(self, request, pk):
         if request.method == 'POST':
             db_task = self.get_object() # call check_object_permissions as well
             serializer = DataSerializer(data=request.data)
+            print(request.data, "request_data")
             serializer.is_valid(raise_exception=True)
             db_data = serializer.save()
             db_task.data = db_data
             db_task.save()
             data = {k:v for k, v in serializer.data.items()}
+            print('data -> ', data, 'db_data -> ', db_data, 'serializer -> ', serializer)
             data['use_zip_chunks'] = serializer.validated_data['use_zip_chunks']
             data['use_cache'] = serializer.validated_data['use_cache']
             if data['use_cache']:
@@ -1008,3 +1013,27 @@ def get_s3_signed_data(request):
             {"message": ex.__str__()},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+# def store_path(self, request):
+    # getting s3 data and save it to DB
+    # db_task = self.get_object()  # call check_object_permissions as well
+    # serializer = DataSerializer(data=request.data)
+    # serializer.is_valid(raise_exception=True)
+    # db_data = serializer.save()
+    # db_task.data = db_data
+    # db_task.save()
+    # data = {k: v for k, v in serializer.data.items()}
+    # print('data -> ', data, 'db_data -> ', db_data)
+    # data['use_zip_chunks'] = serializer.validated_data['use_zip_chunks']
+    # data['use_cache'] = serializer.validated_data['use_cache']
+    # if data['use_cache']:
+    #     db_task.data.storage_method = StorageMethodChoice.CACHE
+    #     db_task.data.save(update_fields=['storage_method'])
+    #
+    # # if the value of stop_frame is 0, then inside the function we cannot know
+    # # the value specified by the user or it's default value from the database
+    # if 'stop_frame' not in serializer.validated_data:
+    #     data['stop_frame'] = None
+    # task.create(db_task.id, data)
+    # return Response({}, status=status.HTTP_202_ACCEPTED)

@@ -1,6 +1,7 @@
 # Copyright (C) 2018 Intel Corporation
 #
 # SPDX-License-Identifier: MIT
+import dj_database_url
 
 from .base import *
 
@@ -21,10 +22,10 @@ SENDFILE_BACKEND = 'sendfile.backends.development'
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
+    'default': dj_database_url.parse(
+        "postgres://aecieibyclfxcs:20efec491d7b33fbbd50c0a46a976987f4d871e0cff119e69ac70e76712624b8@ec2-52-203-182-92.compute-1.amazonaws.com:5432/d2blnogbhci72m",
+        conn_max_age=600
+    )
 }
 
 # Cross-Origin Resource Sharing settings for CVAT UI

@@ -895,6 +895,7 @@
                 client_files: [],
                 remote_files: [],
             });
+            data.s3_data = []
 
             if (Array.isArray(initialData.segments)) {
                 for (const segment of initialData.segments) {
@@ -916,15 +917,19 @@
             }
 
             if (Array.isArray(initialData.labels)) {
-                for (const label of initialData.labels) {
+                for (const label of initialData.labels) {``
                     const classInstance = new Label(label);
                     data.labels.push(classInstance);
                 }
             }
+            if (Array.isArray(initialData.labels)) {
+                console.log('initial data -> ', initialData)
+                data.s3_data = initialData.s3_data  
+            }
 
             Object.defineProperties(
                 this,
-                Object.freeze({
+                 Object.freeze({
                     /**
                      * @name id
                      * @type {integer}
@@ -949,6 +954,32 @@
                                 throw new ArgumentError('Value must not be empty');
                             }
                             data.name = value;
+                        },
+                    },
+                    /**
+                     * After task has been created value can be appended only.
+                     * @name s3_data
+                     * @type {module:API.cvat.classes.Label[]}
+                     * @memberof module:API.cvat.classes.Task
+                     * @instance
+                     * @throws {module:API.cvat.exceptions.ArgumentError}
+                     */
+                    s3_data: {
+                        get: () => [...data.s3_data],
+                        set: (labels) => {
+                            if (!Array.isArray(s3_data)) {
+                                throw new ArgumentError('Value must be an array of Labels');
+                            }
+
+                            for (const label of labels) {
+                                if (!(label instanceof Label)) {
+                                    throw new ArgumentError(
+                                        `Each array value must be an instance of Label. ${typeof label} was found`,
+                                    );
+                                }
+                            }
+
+                            data.s3_data = [...labels];
                         },
                     },
                     /**
@@ -1667,6 +1698,7 @@
         const taskSpec = {
             name: this.name,
             labels: this.labels.map((el) => el.toJSON()),
+            s3_data: this.s3_data,
         };
 
         if (typeof this.bugTracker !== 'undefined') {
